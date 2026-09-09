@@ -1,4 +1,4 @@
-# ========== NEO-BRUTALISM STREAMLIT APP – WITH REAL PREDICTIONS ==========
+# ========== NEO-BRUTALISM STREAMLIT APP – FINAL ==========
 # File: app.py
 # Run: streamlit run app.py
 
@@ -159,7 +159,7 @@ st.markdown("""
         border-color: #ff0033 !important;
     }
 
-    /* ===== SLIDERS - FIXED VISIBILITY ===== */
+    /* ===== SLIDERS ===== */
     .stSlider > div > div > div {
         background: black !important;
         border-radius: 0 !important;
@@ -490,19 +490,14 @@ def get_real_prediction(continent, region, country, city, month, year, attractio
     
     input_df = pd.DataFrame([input_values], columns=feature_names)
 
-    # ===== GET PREDICTIONS AND PROBABILITIES =====
+    # Make predictions
     pred_rating = reg_model.predict(input_df)[0]
     pred_mode_enc = clf_model.predict(input_df)[0]
     
-    # ===== GET PROBABILITIES FOR EACH CLASS =====
-    mode_probabilities = clf_model.predict_proba(input_df)[0]
-    
-    # Get the class names from the encoder
-    mode_classes = encoders['VisitMode'].classes_
-    
-    # Print detailed debug output
+    # Debug output to terminal
     print("="*60)
-    print("🔍 PREDICTION DETAILS:")
+    print("🔍 INPUT DATA SENT TO MODEL:")
+    print(input_df)
     print("-"*60)
     print(f"📍 Continent: {continent} -> {enc_cont}")
     print(f"📍 Region: {region} -> {enc_reg}")
@@ -511,6 +506,10 @@ def get_real_prediction(continent, region, country, city, month, year, attractio
     print(f"📍 Type: {attraction_type} -> {enc_type}")
     print(f"📍 Season: {season} -> {enc_season}")
     print("-"*60)
+    
+    # Get probabilities for each class
+    mode_probabilities = clf_model.predict_proba(input_df)[0]
+    mode_classes = encoders['VisitMode'].classes_
     print("📊 CLASS PROBABILITIES:")
     for i, (cls, prob) in enumerate(zip(mode_classes, mode_probabilities)):
         print(f"   {cls}: {prob:.4f} ({prob*100:.1f}%)")
@@ -577,7 +576,7 @@ st.markdown("""
 # ========== TABS ==========
 tab1, tab2, tab3 = st.tabs(["📊 PREDICT", "🔎 RECOMMEND", "📈 DASH"])
 
-# ========== TAB 1: PREDICT (CASCADING DROPDOWNS) ==========
+# ========== TAB 1: PREDICT ==========
 with tab1:
     st.header("🔥 PREDICT RATING & VIBE")
     st.markdown("DROP YOUR DETAILS AND LET THE MACHINE GO BRRR.")
@@ -586,16 +585,19 @@ with tab1:
     with col1:
         continent = st.selectbox("🌍 CONTINENT", continent_names, key='continent')
         
+        # Get ContinentId for filtering regions
         continent_df = pd.read_excel('data/Continent.xlsx')
         cont_id = continent_df[continent_df['Continent'] == continent]['ContinentId'].iloc[0]
         regions = region_map.get(cont_id, ['No Regions'])
         region = st.selectbox("📍 REGION", regions, key='region')
         
+        # Get RegionId for filtering countries
         region_df = pd.read_excel('data/Region.xlsx')
         reg_id = region_df[region_df['Region'] == region]['RegionId'].iloc[0]
         countries = country_map.get(reg_id, ['No Countries'])
         country = st.selectbox("🏳️ COUNTRY", countries, key='country')
         
+        # Get CountryId for filtering cities
         country_df = pd.read_excel('data/Country.xlsx')
         cou_id = country_df[country_df['Country'] == country]['CountryId'].iloc[0]
         cities = city_map.get(cou_id, ['No Cities'])
@@ -611,7 +613,6 @@ with tab1:
     if st.button("🔮 PREDICT NOW!", use_container_width=True):
         with st.spinner("🧠 CALCULATING MAYHEM..."):
             try:
-                # ===== USE REAL PREDICTIONS =====
                 pred_rating, pred_mode = get_real_prediction(
                     continent, region, country, city,
                     month, year, attraction_type,
