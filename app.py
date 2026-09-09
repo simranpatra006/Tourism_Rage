@@ -9,11 +9,27 @@ import pickle
 import plotly.express as px
 import plotly.graph_objects as go
 
-# ========== CHECK IF MODELS EXIST, RETRAIN IF NOT ==========
+# ========== CHECK FOR MODELS, RETRAIN IF MISSING ==========
 import os
-if not os.path.exists('regressor.pkl') or not os.path.exists('classifier.pkl'):
-    print("⚠️ Models not found. Retraining...")
-    os.system('python train_models.py')
+import subprocess
+
+def ensure_models_exist():
+    """Check if model files exist; if not, run train_models.py."""
+    required = ['regressor.pkl', 'classifier.pkl']
+    missing = [f for f in required if not os.path.exists(f)]
+    
+    if missing:
+        st.warning(f"⚠️ Missing model files: {missing}. Retraining now...")
+        try:
+            # Run the training script
+            subprocess.run(['python', 'train_models.py'], check=True, capture_output=True, text=True)
+            st.success("✅ Models retrained successfully!")
+        except Exception as e:
+            st.error(f"❌ Failed to train models: {e}")
+            st.stop()
+
+# Call this function before loading models
+ensure_models_exist()
 
 # ========== PAGE CONFIG ==========
 st.set_page_config(
