@@ -2,57 +2,61 @@
 # File: app.py
 # Run: streamlit run app.py
 
-import streamlit as st
 import pandas as pd
-import numpy as np
 import pickle
-import plotly.express as px
-import plotly.graph_objects as go
-
-# ========== CHECK FOR MODELS, RETRAIN IF MISSING ==========
 import os
-import subprocess
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.model_selection import train_test_split
+import streamlit as st
 
-def ensure_models_exist():
-    """Check and retrain models if missing."""
-    required = ['regressor.pkl', 'classifier.pkl']
-    missing = [f for f in required if not os.path.exists(f)]
-    
-    if missing:
-        st.warning(f"⚠️ Missing model files: {missing}. Retraining now...")
-        
-        # Create a placeholder for progress
-        status_placeholder = st.empty()
-        status_placeholder.info("🔄 Training models... This may take 1-2 minutes.")
-        
+# ========== TRAINING FUNCTION ==========
+def train_models():
+    """Train and save models if they don't exist."""
+    with st.spinner("🔄 Training models... This may take 1-2 minutes."):
         try:
-            # Run the training script
-            result = subprocess.run(
-                ['python', 'train_models.py'],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
-            # Print stdout/stderr for debugging (visible in logs)
-            print(result.stdout)
-            if result.stderr:
-                print(result.stderr)
-            
-            status_placeholder.success("✅ Models retrained successfully! Reloading...")
-            st.rerun()
-        except subprocess.TimeoutExpired:
-            status_placeholder.error("❌ Training timed out after 5 minutes.")
-            st.stop()
+            # Load data and encoders
+            df = pd.read_csv('cleaned_tourism.csv')
+            encoders = pickle.load(open('encoders.pkl', 'rb'))
+            feature_names = pickle.load(open('feature_names.pkl', 'rb'))
+
+            # Prepare features
+            X = df.drop(columns=['Rating', 'VisitMode', 'UserId', 'AttractionId', 'TransactionId'], errors='ignore')
+            y_reg = df['Rating']
+            y_clf = df['VisitMode']
+            X = X[feature_names]
+
+            # Split
+            X_train, X_test, y_reg_train, y_reg_test = train_test_split(X, y_reg, test_size=0.2, random_state=42)
+            _, _, y_clf_train, y_clf_test = train_test_split(X, y_clf, test_size=0.2, random_state=42)
+
+            # Train Regression
+            reg_model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+            reg_model.fit(X_train, y_reg_train)
+            pickle.dump(reg_model, open('regressor.pkl', 'wb'))
+
+            # Train Classification
+            clf_model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42, n_jobs=-1)
+            clf_model.fit(X_train, y_clf_train)
+            pickle.dump(clf_model, open('classifier.pkl', 'wb'))
+
+            st.success("✅ Models trained successfully!")
+            return True
         except Exception as e:
-            status_placeholder.error(f"❌ Failed to train models: {e}")
-            # Show more detailed error
-            if hasattr(e, 'stderr') and e.stderr:
-                st.error(e.stderr)
+            st.error(f"❌ Training failed: {e}")
+            return False
+
+# ========== CHECK AND TRAIN IF NEEDED ==========
+def ensure_models():
+    if not os.path.exists('regressor.pkl') or not os.path.exists('classifier.pkl'):
+        st.warning("⚠️ Models not found. Training now...")
+        success = train_models()
+        if success:
+            st.rerun()
+        else:
             st.stop()
 
-# Run the check BEFORE any other code
-ensure_models_exist()
+# Run this check before anything else
+ensure_models()
 
 # ========== PAGE CONFIG ==========
 st.set_page_config(
