@@ -14,21 +14,44 @@ import os
 import subprocess
 
 def ensure_models_exist():
-    """Check if model files exist; if not, run train_models.py."""
+    """Check and retrain models if missing."""
     required = ['regressor.pkl', 'classifier.pkl']
     missing = [f for f in required if not os.path.exists(f)]
     
     if missing:
         st.warning(f"⚠️ Missing model files: {missing}. Retraining now...")
+        
+        # Create a placeholder for progress
+        status_placeholder = st.empty()
+        status_placeholder.info("🔄 Training models... This may take 1-2 minutes.")
+        
         try:
             # Run the training script
-            subprocess.run(['python', 'train_models.py'], check=True, capture_output=True, text=True)
-            st.success("✅ Models retrained successfully!")
+            result = subprocess.run(
+                ['python', 'train_models.py'],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minutes timeout
+            )
+            # Print stdout/stderr for debugging (visible in logs)
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            
+            status_placeholder.success("✅ Models retrained successfully! Reloading...")
+            st.rerun()
+        except subprocess.TimeoutExpired:
+            status_placeholder.error("❌ Training timed out after 5 minutes.")
+            st.stop()
         except Exception as e:
-            st.error(f"❌ Failed to train models: {e}")
+            status_placeholder.error(f"❌ Failed to train models: {e}")
+            # Show more detailed error
+            if hasattr(e, 'stderr') and e.stderr:
+                st.error(e.stderr)
             st.stop()
 
-# Call this function before loading models
+# Run the check BEFORE any other code
 ensure_models_exist()
 
 # ========== PAGE CONFIG ==========
