@@ -1,62 +1,18 @@
-# ========== NEO-BRUTALISM STREAMLIT APP – FINAL ==========
+# ========== NEO-BRUTALISM STREAMLIT APP – WITH AUTO-TRAINING ==========
 # File: app.py
 # Run: streamlit run app.py
 
+import streamlit as st
 import pandas as pd
+import numpy as np
 import pickle
 import os
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split
-import streamlit as st
-
-# ========== TRAINING FUNCTION ==========
-def train_models():
-    """Train and save models if they don't exist."""
-    with st.spinner("🔄 Training models... This may take 1-2 minutes."):
-        try:
-            # Load data and encoders
-            df = pd.read_csv('cleaned_tourism.csv')
-            encoders = pickle.load(open('encoders.pkl', 'rb'))
-            feature_names = pickle.load(open('feature_names.pkl', 'rb'))
-
-            # Prepare features
-            X = df.drop(columns=['Rating', 'VisitMode', 'UserId', 'AttractionId', 'TransactionId'], errors='ignore')
-            y_reg = df['Rating']
-            y_clf = df['VisitMode']
-            X = X[feature_names]
-
-            # Split
-            X_train, X_test, y_reg_train, y_reg_test = train_test_split(X, y_reg, test_size=0.2, random_state=42)
-            _, _, y_clf_train, y_clf_test = train_test_split(X, y_clf, test_size=0.2, random_state=42)
-
-            # Train Regression
-            reg_model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
-            reg_model.fit(X_train, y_reg_train)
-            pickle.dump(reg_model, open('regressor.pkl', 'wb'))
-
-            # Train Classification
-            clf_model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42, n_jobs=-1)
-            clf_model.fit(X_train, y_clf_train)
-            pickle.dump(clf_model, open('classifier.pkl', 'wb'))
-
-            st.success("✅ Models trained successfully!")
-            return True
-        except Exception as e:
-            st.error(f"❌ Training failed: {e}")
-            return False
-
-# ========== CHECK AND TRAIN IF NEEDED ==========
-def ensure_models():
-    if not os.path.exists('regressor.pkl') or not os.path.exists('classifier.pkl'):
-        st.warning("⚠️ Models not found. Training now...")
-        success = train_models()
-        if success:
-            st.rerun()
-        else:
-            st.stop()
-
-# Run this check before anything else
-ensure_models()
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics.pairwise import cosine_similarity
+import plotly.express as px
+import plotly.graph_objects as go
 
 # ========== PAGE CONFIG ==========
 st.set_page_config(
@@ -389,117 +345,189 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== LOAD MODELS AND BUILD ENCODING MAPS ==========
-@st.cache_resource
-def load_models():
-    try:
-        # Load ML models and supporting files
-        reg_model = pickle.load(open('regressor.pkl', 'rb'))
-        clf_model = pickle.load(open('classifier.pkl', 'rb'))
-        feature_names = pickle.load(open('feature_names.pkl', 'rb'))
-        encoders = pickle.load(open('encoders.pkl', 'rb'))
-        attraction_list = pickle.load(open('attraction_list.pkl', 'rb'))
-        attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
-        similarity_matrix = pickle.load(open('similarity_matrix.pkl', 'rb'))
-        df = pd.read_csv('cleaned_tourism.csv')
+# ============================================================
+# ========== AUTO-TRAINING SECTION ==========================
+# ============================================================
 
-        # Load raw mapping tables
-        continent_df = pd.read_excel('data/Continent.xlsx')
-        region_df = pd.read_excel('data/Region.xlsx')
-        country_df = pd.read_excel('data/Country.xlsx')
-        city_df = pd.read_excel('data/City.xlsx')
-        type_df = pd.read_excel('data/Type.xlsx')
+def train_models_and_similarity():
+    """Train all models and similarity matrix if missing."""
+    with st.spinner("🔄 Training models... This may take 1-2 minutes."):
+        try:
+            # Load data
+            df = pd.read_csv('cleaned_tourism.csv')
+            encoders = pickle.load(open('encoders.pkl', 'rb'))
+            feature_names = pickle.load(open('feature_names.pkl', 'rb'))
+            
+            # ---------- Train Regression & Classification ----------
+            X = df.drop(columns=['Rating', 'VisitMode', 'UserId', 'AttractionId', 'TransactionId'], errors='ignore')
+            y_reg = df['Rating']
+            y_clf = df['VisitMode']
+            X = X[feature_names]
 
-        # Build cascading maps
-        continent_names = continent_df['Continent'].tolist()
-        
-        region_map = {}
-        for _, row in region_df.iterrows():
-            cont_id = row['ContinentId']
-            region = row['Region']
-            if cont_id not in region_map:
-                region_map[cont_id] = []
-            region_map[cont_id].append(region)
-        
-        country_map = {}
-        for _, row in country_df.iterrows():
-            reg_id = row['RegionId']
-            country = row['Country']
-            if reg_id not in country_map:
-                country_map[reg_id] = []
-            country_map[reg_id].append(country)
-        
-        city_map = {}
-        for _, row in city_df.iterrows():
-            cou_id = row['CountryId']
-            city = row['CityName']
-            if cou_id not in city_map:
-                city_map[cou_id] = []
-            city_map[cou_id].append(city)
-        
-        type_names = type_df['AttractionType'].tolist()
+            X_train, X_test, y_reg_train, y_reg_test = train_test_split(X, y_reg, test_size=0.2, random_state=42)
+            _, _, y_clf_train, y_clf_test = train_test_split(X, y_clf, test_size=0.2, random_state=42)
 
-        # Build encoding maps (Name -> Encoded Value)
-        encoded_continent_map = {}
-        for name in continent_names:
-            try:
-                encoded_continent_map[name] = encoders['Continent'].transform([name])[0]
-            except:
-                encoded_continent_map[name] = 0
-        
-        encoded_region_map = {}
-        all_regions = region_df['Region'].tolist()
-        for name in all_regions:
-            try:
-                encoded_region_map[name] = encoders['Region'].transform([name])[0]
-            except:
-                encoded_region_map[name] = 0
-        
-        encoded_country_map = {}
-        all_countries = country_df['Country'].tolist()
-        for name in all_countries:
-            try:
-                encoded_country_map[name] = encoders['Country'].transform([name])[0]
-            except:
-                encoded_country_map[name] = 0
-        
-        encoded_city_map = {}
-        all_cities = city_df['CityName'].tolist()
-        for name in all_cities:
-            try:
-                encoded_city_map[name] = encoders['CityName'].transform([name])[0]
-            except:
-                encoded_city_map[name] = 0
-        
-        encoded_type_map = {}
-        for name in type_names:
-            try:
-                encoded_type_map[name] = encoders['AttractionType'].transform([name])[0]
-            except:
-                encoded_type_map[name] = 0
-        
-        season_names = ['Winter', 'Spring', 'Summer', 'Fall']
-        encoded_season_map = {}
-        for name in season_names:
-            try:
-                encoded_season_map[name] = encoders['Season'].transform([name])[0]
-            except:
-                encoded_season_map[name] = 0
+            # Regression
+            reg_model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+            reg_model.fit(X_train, y_reg_train)
+            pickle.dump(reg_model, open('regressor.pkl', 'wb'))
 
-        return (reg_model, clf_model, feature_names, encoders, attraction_list,
-                attractions_df, similarity_matrix, df,
-                continent_names, region_map, country_map, city_map, type_names,
-                encoded_continent_map, encoded_region_map, encoded_country_map,
-                encoded_city_map, encoded_type_map, encoded_season_map)
-    except Exception as e:
-        st.error(f"❌ Error loading: {e}")
-        st.stop()
+            # Classification
+            clf_model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42, n_jobs=-1)
+            clf_model.fit(X_train, y_clf_train)
+            pickle.dump(clf_model, open('classifier.pkl', 'wb'))
+
+            # ---------- Build Similarity Matrix ----------
+            # Load attractions data
+            attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
+            
+            # Encode AttractionType and CityName
+            encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+            feature_vectors = encoder.fit_transform(attractions_df[['AttractionType', 'CityName']])
+            
+            # Compute cosine similarity
+            similarity_matrix = cosine_similarity(feature_vectors)
+            pickle.dump(similarity_matrix, open('similarity_matrix.pkl', 'wb'))
+            
+            st.success("✅ All models and similarity matrix trained successfully!")
+            return True
+        except Exception as e:
+            st.error(f"❌ Training failed: {e}")
+            import traceback
+            st.error(traceback.format_exc())
+            return False
+
+def ensure_models_and_similarity():
+    """Check for all required files and train if missing."""
+    required = ['regressor.pkl', 'classifier.pkl', 'similarity_matrix.pkl']
+    missing = [f for f in required if not os.path.exists(f)]
+    
+    if missing:
+        st.warning(f"⚠️ Missing files: {missing}. Training now...")
+        success = train_models_and_similarity()
+        if success:
+            st.rerun()
+        else:
+            st.stop()
+
+# Run the check before loading anything else
+ensure_models_and_similarity()
+
+# ============================================================
+# ========== LOAD ALL MODELS AND DATA ========================
+# ============================================================
+
+def load_all_assets():
+    """Load all models, encoders, dataframes, and similarity matrix."""
+    reg_model = pickle.load(open('regressor.pkl', 'rb'))
+    clf_model = pickle.load(open('classifier.pkl', 'rb'))
+    feature_names = pickle.load(open('feature_names.pkl', 'rb'))
+    encoders = pickle.load(open('encoders.pkl', 'rb'))
+    attraction_list = pickle.load(open('attraction_list.pkl', 'rb'))
+    attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
+    similarity_matrix = pickle.load(open('similarity_matrix.pkl', 'rb'))
+    df = pd.read_csv('cleaned_tourism.csv')
+
+    # Load mapping tables for dropdowns
+    continent_df = pd.read_excel('data/Continent.xlsx')
+    region_df = pd.read_excel('data/Region.xlsx')
+    country_df = pd.read_excel('data/Country.xlsx')
+    city_df = pd.read_excel('data/City.xlsx')
+    type_df = pd.read_excel('data/Type.xlsx')
+
+    # Build cascading maps
+    continent_names = continent_df['Continent'].tolist()
+    
+    region_map = {}
+    for _, row in region_df.iterrows():
+        cont_id = row['ContinentId']
+        region = row['Region']
+        if cont_id not in region_map:
+            region_map[cont_id] = []
+        region_map[cont_id].append(region)
+    
+    country_map = {}
+    for _, row in country_df.iterrows():
+        reg_id = row['RegionId']
+        country = row['Country']
+        if reg_id not in country_map:
+            country_map[reg_id] = []
+        country_map[reg_id].append(country)
+    
+    city_map = {}
+    for _, row in city_df.iterrows():
+        cou_id = row['CountryId']
+        city = row['CityName']
+        if cou_id not in city_map:
+            city_map[cou_id] = []
+        city_map[cou_id].append(city)
+    
+    type_names = type_df['AttractionType'].tolist()
+
+    # Build encoding maps (Name -> Encoded Value)
+    encoded_continent_map = {}
+    for name in continent_names:
+        try:
+            encoded_continent_map[name] = encoders['Continent'].transform([name])[0]
+        except:
+            encoded_continent_map[name] = 0
+    
+    encoded_region_map = {}
+    all_regions = region_df['Region'].tolist()
+    for name in all_regions:
+        try:
+            encoded_region_map[name] = encoders['Region'].transform([name])[0]
+        except:
+            encoded_region_map[name] = 0
+    
+    encoded_country_map = {}
+    all_countries = country_df['Country'].tolist()
+    for name in all_countries:
+        try:
+            encoded_country_map[name] = encoders['Country'].transform([name])[0]
+        except:
+            encoded_country_map[name] = 0
+    
+    encoded_city_map = {}
+    all_cities = city_df['CityName'].tolist()
+    for name in all_cities:
+        try:
+            encoded_city_map[name] = encoders['CityName'].transform([name])[0]
+        except:
+            encoded_city_map[name] = 0
+    
+    encoded_type_map = {}
+    for name in type_names:
+        try:
+            encoded_type_map[name] = encoders['AttractionType'].transform([name])[0]
+        except:
+            encoded_type_map[name] = 0
+    
+    season_names = ['Winter', 'Spring', 'Summer', 'Fall']
+    encoded_season_map = {}
+    for name in season_names:
+        try:
+            encoded_season_map[name] = encoders['Season'].transform([name])[0]
+        except:
+            encoded_season_map[name] = 0
+
+    return (reg_model, clf_model, feature_names, encoders, attraction_list,
+            attractions_df, similarity_matrix, df,
+            continent_names, region_map, country_map, city_map, type_names,
+            encoded_continent_map, encoded_region_map, encoded_country_map,
+            encoded_city_map, encoded_type_map, encoded_season_map,
+            continent_df, region_df, country_df, city_df)
+
+# ============================================================
+# ========== LOAD ASSETS =====================================
+# ============================================================
 
 (reg_model, clf_model, feature_names, encoders, attraction_list,
  attractions_df, similarity_matrix, df,
  continent_names, region_map, country_map, city_map, type_names,
  encoded_continent_map, encoded_region_map, encoded_country_map,
- encoded_city_map, encoded_type_map, encoded_season_map) = load_models()
+ encoded_city_map, encoded_type_map, encoded_season_map,
+ continent_df, region_df, country_df, city_df) = load_all_assets()
 
 # ========== HELPER FUNCTIONS ==========
 def get_season(month):
@@ -515,7 +543,6 @@ def get_season(month):
 def get_real_prediction(continent, region, country, city, month, year, attraction_type, user_avg, attr_avg):
     season = get_season(month)
 
-    # Get encoded values from maps
     enc_cont = encoded_continent_map.get(continent, 0)
     enc_reg = encoded_region_map.get(region, 0)
     enc_cou = encoded_country_map.get(country, 0)
@@ -523,55 +550,27 @@ def get_real_prediction(continent, region, country, city, month, year, attractio
     enc_type = encoded_type_map.get(attraction_type, 0)
     enc_season = encoded_season_map.get(season, 0)
 
-    # Build input in the EXACT order of feature_names
     input_values = [
-        year,               # VisitYear
-        month,              # VisitMonth
-        enc_cont,           # Continent
-        enc_reg,            # Region
-        enc_cou,            # Country
-        enc_city,           # CityName
-        enc_type,           # AttractionType
-        user_avg,           # User_Avg_Rating
-        attr_avg,           # Attraction_Avg_Rating
-        enc_season          # Season
+        year, month, enc_cont, enc_reg, enc_cou, enc_city, enc_type,
+        user_avg, attr_avg, enc_season
     ]
-    
     input_df = pd.DataFrame([input_values], columns=feature_names)
 
-    # Make predictions
     pred_rating = reg_model.predict(input_df)[0]
     pred_mode_enc = clf_model.predict(input_df)[0]
-    
-    # Debug output to terminal
-    print("="*60)
-    print("🔍 INPUT DATA SENT TO MODEL:")
-    print(input_df)
-    print("-"*60)
-    print(f"📍 Continent: {continent} -> {enc_cont}")
-    print(f"📍 Region: {region} -> {enc_reg}")
-    print(f"📍 Country: {country} -> {enc_cou}")
-    print(f"📍 City: {city} -> {enc_city}")
-    print(f"📍 Type: {attraction_type} -> {enc_type}")
-    print(f"📍 Season: {season} -> {enc_season}")
-    print("-"*60)
-    
-    # Get probabilities for each class
-    mode_probabilities = clf_model.predict_proba(input_df)[0]
-    mode_classes = encoders['VisitMode'].classes_
-    print("📊 CLASS PROBABILITIES:")
-    for i, (cls, prob) in enumerate(zip(mode_classes, mode_probabilities)):
-        print(f"   {cls}: {prob:.4f} ({prob*100:.1f}%)")
-    print("-"*60)
-    print(f"📊 Predicted Rating: {pred_rating:.4f}")
-    print(f"📊 Predicted Mode: {mode_classes[pred_mode_enc]}")
-    print("="*60)
-    
     try:
         pred_mode = encoders['VisitMode'].inverse_transform([pred_mode_enc])[0]
     except:
         pred_mode = "Unknown"
-    
+
+    # Debug to terminal
+    print("="*60)
+    print("🔍 INPUT DATA:")
+    print(input_df)
+    print("📊 Predicted Rating:", pred_rating)
+    print("📊 Predicted Mode:", pred_mode)
+    print("="*60)
+
     return pred_rating, pred_mode
 
 # ========== SIDEBAR ==========
@@ -634,20 +633,14 @@ with tab1:
     with col1:
         continent = st.selectbox("🌍 CONTINENT", continent_names, key='continent')
         
-        # Get ContinentId for filtering regions
-        continent_df = pd.read_excel('data/Continent.xlsx')
         cont_id = continent_df[continent_df['Continent'] == continent]['ContinentId'].iloc[0]
         regions = region_map.get(cont_id, ['No Regions'])
         region = st.selectbox("📍 REGION", regions, key='region')
         
-        # Get RegionId for filtering countries
-        region_df = pd.read_excel('data/Region.xlsx')
         reg_id = region_df[region_df['Region'] == region]['RegionId'].iloc[0]
         countries = country_map.get(reg_id, ['No Countries'])
         country = st.selectbox("🏳️ COUNTRY", countries, key='country')
         
-        # Get CountryId for filtering cities
-        country_df = pd.read_excel('data/Country.xlsx')
         cou_id = country_df[country_df['Country'] == country]['CountryId'].iloc[0]
         cities = city_map.get(cou_id, ['No Cities'])
         city = st.selectbox("🏙️ CITY", cities, key='city')
