@@ -1,11 +1,31 @@
-# train_models.py – ULTIMATE WORKING VERSION for Streamlit Cloud
+# train_models.py – With auto-install for dependencies
 
+import subprocess
+import sys
+import os
+
+# ========== AUTO-INSTALL DEPENDENCIES ==========
+def install_packages():
+    """Install required packages if missing."""
+    required = ['pandas', 'numpy', 'scikit-learn', 'openpyxl']
+    for pkg in required:
+        try:
+            if pkg == 'scikit-learn':
+                __import__('sklearn')
+            else:
+                __import__(pkg)
+            print(f"✅ {pkg} already installed")
+        except ImportError:
+            print(f"📦 Installing {pkg}...")
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', pkg, '--quiet'])
+
+install_packages()
+
+# ========== NOW IMPORT REQUIRED PACKAGES ==========
 import pandas as pd
 import pickle
-import os
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split
-import sys
 
 print("="*60)
 print("🔄 STARTING MODEL RETRAINING...")
@@ -37,7 +57,7 @@ print(f"   ✅ feature_names.pkl loaded ({len(feature_names)} features)")
 # ========== PREPARE DATA FOR TRAINING ==========
 print("\n🔧 Preparing features...")
 
-# Drop target columns and non-feature columns from X
+# Drop target columns and non-feature columns
 X = df.drop(columns=['Rating', 'VisitMode', 'UserId', 'AttractionId', 'TransactionId'], errors='ignore')
 y_reg = df['Rating']
 y_clf = df['VisitMode']
@@ -56,18 +76,18 @@ print(f"   ✅ Train size: {len(X_train)}, Test size: {len(X_test)}")
 print("\n🤖 Training models...")
 
 # Regression
-print("   Training RandomForestRegressor (n_estimators=100)...")
+print("   Training RandomForestRegressor...")
 reg_model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
 reg_model.fit(X_train, y_reg_train)
 pickle.dump(reg_model, open('regressor.pkl', 'wb'))
-print(f"   ✅ regressor.pkl saved ({os.path.getsize('regressor.pkl') / (1024*1024):.2f} MB)")
+print(f"   ✅ regressor.pkl saved")
 
 # Classification
-print("   Training RandomForestClassifier (n_estimators=100, class_weight='balanced')...")
+print("   Training RandomForestClassifier...")
 clf_model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42, n_jobs=-1)
 clf_model.fit(X_train, y_clf_train)
 pickle.dump(clf_model, open('classifier.pkl', 'wb'))
-print(f"   ✅ classifier.pkl saved ({os.path.getsize('classifier.pkl') / (1024*1024):.2f} MB)")
+print(f"   ✅ classifier.pkl saved")
 
 # ========== VERIFY ==========
 print("\n✅ Verifying saved files...")
