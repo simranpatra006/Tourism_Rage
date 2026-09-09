@@ -9,6 +9,12 @@ import pickle
 import plotly.express as px
 import plotly.graph_objects as go
 
+# ========== CHECK IF MODELS EXIST, RETRAIN IF NOT ==========
+import os
+if not os.path.exists('regressor.pkl') or not os.path.exists('classifier.pkl'):
+    print("⚠️ Models not found. Retraining...")
+    os.system('python train_models.py')
+
 # ========== PAGE CONFIG ==========
 st.set_page_config(
     page_title="🌍 TOURISM RAGE",
