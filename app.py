@@ -1,4 +1,4 @@
-# ========== NEO-BRUTALISM STREAMLIT APP – WITH AUTO-TRAINING ==========
+# ========== NEO-BRUTALISM STREAMLIT APP – OPTIMIZED FOR SPEED ==========
 # File: app.py
 # Run: streamlit run app.py
 
@@ -6,7 +6,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import joblib
 import os
+import gc
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
@@ -33,6 +35,12 @@ st.markdown("""
         font-family: 'Courier New', monospace !important;
     }
 
+    /* ===== FORCE VISIBLE TEXT ===== */
+    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+    .stApp label, .stApp span, .stApp small, .stApp strong {
+        color: black !important;
+    }
+
     /* ===== SIDEBAR ===== */
     .css-1d391kg, .css-1kyxreq {
         background: #ffcc00 !important;
@@ -52,7 +60,6 @@ st.markdown("""
         margin: 16px 0;
         box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
         transition: all 0.1s ease;
-        transform: rotate(0deg);
     }
     .brutal-card:hover {
         transform: translate(-4px, -4px);
@@ -69,7 +76,7 @@ st.markdown("""
     .main-title {
         font-size: 4.5rem;
         font-weight: 900;
-        color: #ff0033;
+        color: #ff0033 !important;
         text-align: center;
         text-shadow: 6px 6px 0 #00ff00, 12px 12px 0 #0000ff;
         background: #ffff00;
@@ -85,7 +92,7 @@ st.markdown("""
         text-align: center;
         font-size: 1.5rem;
         font-weight: 700;
-        color: #ffffff;
+        color: #ffffff !important;
         background: #ff6600;
         padding: 0.8rem 2rem;
         border: 5px solid black;
@@ -140,7 +147,6 @@ st.markdown("""
         margin: 0 4px;
         font-size: 1rem;
         text-transform: uppercase;
-        transition: 0s;
     }
     .stTabs [data-baseweb="tab"]:hover {
         background: #ff8800;
@@ -159,9 +165,7 @@ st.markdown("""
         box-shadow: 6px 6px 0 rgba(0,0,0,0.2) !important;
         padding: 4px !important;
         font-weight: 700 !important;
-    }
-    .stSelectbox > div > div:focus {
-        border-color: #ff0033 !important;
+        color: black !important;
     }
 
     /* ===== SLIDERS ===== */
@@ -184,12 +188,10 @@ st.markdown("""
         margin-top: -8px !important;
         box-shadow: 4px 4px 0 rgba(0,0,0,0.2) !important;
     }
-    
     .stSlider label {
         color: black !important;
         font-weight: 900 !important;
         font-size: 1.1rem !important;
-        font-family: 'Courier New', monospace !important;
         background: #ffcc00 !important;
         padding: 0 12px !important;
         border: 4px solid black !important;
@@ -197,53 +199,37 @@ st.markdown("""
         margin-bottom: 8px !important;
         text-transform: uppercase !important;
     }
-    
     .stSlider > div > div > div > div > div + div {
         color: black !important;
         font-weight: 900 !important;
         font-size: 1.4rem !important;
-        font-family: 'Courier New', monospace !important;
         background: #00ffcc !important;
         padding: 2px 12px !important;
         border: 4px solid black !important;
         box-shadow: 4px 4px 0 rgba(0,0,0,0.2) !important;
-        border-radius: 0 !important;
     }
-    
     .stSlider > div > div > div > div > div > span,
     .stSlider .st-ae {
         color: black !important;
         font-weight: 900 !important;
         font-size: 1.3rem !important;
-        font-family: 'Courier New', monospace !important;
         background: #ffff00 !important;
         padding: 2px 12px !important;
         border: 3px solid black !important;
-        border-radius: 0 !important;
         box-shadow: 4px 4px 0 rgba(0,0,0,0.2) !important;
-    }
-
-    /* ===== EXPANDER ===== */
-    .streamlit-expanderHeader {
-        background: #00ffcc !important;
-        border: 5px solid black !important;
-        border-radius: 0 !important;
-        box-shadow: 6px 6px 0 rgba(0,0,0,0.2) !important;
-        font-weight: 900 !important;
-        color: black !important;
     }
 
     /* ===== METRICS ===== */
     .metric-value {
         font-size: 3.5rem;
         font-weight: 900;
-        color: #ff0033;
+        color: #ff0033 !important;
         text-shadow: 4px 4px 0 #ffff00;
     }
     .metric-label {
         font-size: 1.2rem;
         font-weight: 700;
-        color: black;
+        color: black !important;
         background: #00ffcc;
         padding: 0 8px;
         border: 3px solid black;
@@ -261,11 +247,11 @@ st.markdown("""
     .sidebar-metric .value {
         font-size: 2rem;
         font-weight: 900;
-        color: #ff0033;
+        color: #ff0033 !important;
     }
     .sidebar-metric .label {
         font-weight: 700;
-        color: black;
+        color: black !important;
     }
 
     /* ===== PROGRESS BAR ===== */
@@ -292,13 +278,12 @@ st.markdown("""
         text-align: center;
         font-weight: 900;
         font-size: 1.2rem;
-        color: black;
-        box-shadow: 0 -12px 0 rgba(0,0,0,0.1);
+        color: black !important;
         transform: rotate(-0.5deg);
     }
     .footer span {
         background: #ff0033;
-        color: white;
+        color: white !important;
         padding: 0 8px;
     }
 
@@ -307,10 +292,6 @@ st.markdown("""
         border: 5px solid black !important;
         border-radius: 0 !important;
         box-shadow: 8px 8px 0 rgba(0,0,0,0.2) !important;
-    }
-    .stAlert > div {
-        font-weight: 700 !important;
-        color: black !important;
     }
 
     /* ===== INPUT NUMBER ===== */
@@ -337,7 +318,7 @@ st.markdown("""
         width: 70px;
     }
     .logo-box h2 {
-        color: white;
+        color: white !important;
         text-shadow: 4px 4px 0 black;
         margin: 0;
         font-size: 2rem;
@@ -346,22 +327,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# ========== OPTIMIZED AUTO-TRAINING =========================
+# ========== AUTO-TRAINING (CACHED, RUNS ONCE) ===============
 # ============================================================
 
-import gc  # Add this to your imports at the top
-
-@st.cache_resource(show_spinner=False)
 def train_models_and_similarity():
     """Train all models and similarity matrix with MEMORY OPTIMIZATION."""
     with st.spinner("🔄 Training models... This may take 1-2 minutes."):
         try:
-            # Load data
             df = pd.read_csv('cleaned_tourism.csv')
             encoders = pickle.load(open('encoders.pkl', 'rb'))
             feature_names = pickle.load(open('feature_names.pkl', 'rb'))
             
-            # ---------- Train Regression & Classification ----------
+            # ---------- Regression & Classification ----------
             X = df.drop(columns=['Rating', 'VisitMode', 'UserId', 'AttractionId', 'TransactionId'], errors='ignore')
             y_reg = df['Rating']
             y_clf = df['VisitMode']
@@ -370,56 +347,32 @@ def train_models_and_similarity():
             X_train, X_test, y_reg_train, y_reg_test = train_test_split(X, y_reg, test_size=0.2, random_state=42)
             _, _, y_clf_train, y_clf_test = train_test_split(X, y_clf, test_size=0.2, random_state=42)
 
-            # ---------- REGRESSION (Smaller Model) ----------
-            print("Training Regressor...")
+            # Regression (compact)
             reg_model = RandomForestRegressor(
-                n_estimators=50,       # Reduced from 100
-                max_depth=15,          # Limit depth
-                min_samples_split=10,  # Prevent overfitting
-                n_jobs=1,              # Single-threaded to save memory
-                random_state=42
+                n_estimators=50, max_depth=15, min_samples_split=10,
+                n_jobs=1, random_state=42
             )
             reg_model.fit(X_train, y_reg_train)
-            
-            # Use joblib for better compression
-            import joblib
             joblib.dump(reg_model, 'regressor.pkl', compress=3)
-            print(f"✅ Regressor saved ({os.path.getsize('regressor.pkl') / 1024:.1f} KB)")
-            
-            # Free memory
             del reg_model
             gc.collect()
 
-            # ---------- CLASSIFICATION (Smaller Model) ----------
-            print("Training Classifier...")
+            # Classification (compact)
             clf_model = RandomForestClassifier(
-                n_estimators=50,
-                max_depth=15,
-                min_samples_split=10,
-                class_weight='balanced',
-                n_jobs=1,
-                random_state=42
+                n_estimators=50, max_depth=15, min_samples_split=10,
+                class_weight='balanced', n_jobs=1, random_state=42
             )
             clf_model.fit(X_train, y_clf_train)
             joblib.dump(clf_model, 'classifier.pkl', compress=3)
-            print(f"✅ Classifier saved ({os.path.getsize('classifier.pkl') / 1024:.1f} KB)")
-            
-            # Free memory
             del clf_model, X_train, X_test
             gc.collect()
 
-            # ---------- SIMILARITY MATRIX ----------
-            print("Building similarity matrix...")
+            # Similarity Matrix
             attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
-            
             encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
             feature_vectors = encoder.fit_transform(attractions_df[['AttractionType', 'CityName']])
-            
             similarity_matrix = cosine_similarity(feature_vectors)
             joblib.dump(similarity_matrix, 'similarity_matrix.pkl', compress=3)
-            print(f"✅ Similarity matrix saved ({os.path.getsize('similarity_matrix.pkl') / 1024:.1f} KB)")
-            
-            # Free memory
             del similarity_matrix, feature_vectors, attractions_df
             gc.collect()
             
@@ -431,7 +384,7 @@ def train_models_and_similarity():
             return False
 
 def ensure_models_and_similarity():
-    """Check for all required files and train if missing."""
+    """Check for required files and train if missing."""
     required = ['regressor.pkl', 'classifier.pkl', 'similarity_matrix.pkl']
     missing = [f for f in required if not os.path.exists(f)]
     
@@ -444,110 +397,145 @@ def ensure_models_and_similarity():
         else:
             st.stop()
 
-# Run the check
 ensure_models_and_similarity()
 
 # ============================================================
-# ========== LOAD ALL MODELS AND DATA ========================
+# ========== CACHED DATA LOADERS (SPEED BOOST) ===============
 # ============================================================
 
-# ========== LOAD ALL MODELS AND DATA ==========
-def load_all_assets():
-    """Load all models, encoders, dataframes, and similarity matrix."""
-    import joblib
-    
-    reg_model = joblib.load('regressor.pkl')
-    clf_model = joblib.load('classifier.pkl')
-    feature_names = pickle.load(open('feature_names.pkl', 'rb'))
-    encoders = pickle.load(open('encoders.pkl', 'rb'))
-    attraction_list = pickle.load(open('attraction_list.pkl', 'rb'))
-    attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
-    similarity_matrix = joblib.load('similarity_matrix.pkl')
-    df = pd.read_csv('cleaned_tourism.csv')
+@st.cache_data(show_spinner=False)
+def load_cleaned_data():
+    """Cache the cleaned tourism CSV."""
+    return pd.read_csv('cleaned_tourism.csv')
 
-    # Load mapping tables for dropdowns
+@st.cache_data(show_spinner=False)
+def load_mapping_tables():
+    """Cache all Excel mapping tables (loaded once)."""
     continent_df = pd.read_excel('data/Continent.xlsx')
     region_df = pd.read_excel('data/Region.xlsx')
     country_df = pd.read_excel('data/Country.xlsx')
     city_df = pd.read_excel('data/City.xlsx')
     type_df = pd.read_excel('data/Type.xlsx')
+    return continent_df, region_df, country_df, city_df, type_df
 
-    # Build cascading maps
-    continent_names = continent_df['Continent'].tolist()
-    
-    region_map = {}
-    for _, row in region_df.iterrows():
-        cont_id = row['ContinentId']
-        region = row['Region']
-        if cont_id not in region_map:
-            region_map[cont_id] = []
-        region_map[cont_id].append(region)
-    
-    country_map = {}
-    for _, row in country_df.iterrows():
-        reg_id = row['RegionId']
-        country = row['Country']
-        if reg_id not in country_map:
-            country_map[reg_id] = []
-        country_map[reg_id].append(country)
-    
-    city_map = {}
-    for _, row in city_df.iterrows():
-        cou_id = row['CountryId']
-        city = row['CityName']
-        if cou_id not in city_map:
-            city_map[cou_id] = []
-        city_map[cou_id].append(city)
-    
-    type_names = type_df['AttractionType'].tolist()
+@st.cache_data(show_spinner=False)
+def load_small_pickles():
+    """Cache small pickle files."""
+    feature_names = pickle.load(open('feature_names.pkl', 'rb'))
+    encoders = pickle.load(open('encoders.pkl', 'rb'))
+    attraction_list = pickle.load(open('attraction_list.pkl', 'rb'))
+    attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
+    return feature_names, encoders, attraction_list, attractions_df
 
-    # Build encoding maps (Name -> Encoded Value)
+@st.cache_resource(show_spinner=False)
+def load_models_cached():
+    """Cache ML models (uses @st.cache_resource for speed)."""
+    reg_model = joblib.load('regressor.pkl')
+    clf_model = joblib.load('classifier.pkl')
+    similarity_matrix = joblib.load('similarity_matrix.pkl')
+    return reg_model, clf_model, similarity_matrix
+
+@st.cache_data(show_spinner=False)
+def build_encoding_maps(continent_names, region_names, country_names, 
+                        city_names, type_names, season_names, _encoders):
+    """Cache the encoded value maps."""
     encoded_continent_map = {}
     for name in continent_names:
         try:
-            encoded_continent_map[name] = encoders['Continent'].transform([name])[0]
+            encoded_continent_map[name] = _encoders['Continent'].transform([name])[0]
         except:
             encoded_continent_map[name] = 0
     
     encoded_region_map = {}
-    all_regions = region_df['Region'].tolist()
-    for name in all_regions:
+    for name in region_names:
         try:
-            encoded_region_map[name] = encoders['Region'].transform([name])[0]
+            encoded_region_map[name] = _encoders['Region'].transform([name])[0]
         except:
             encoded_region_map[name] = 0
     
     encoded_country_map = {}
-    all_countries = country_df['Country'].tolist()
-    for name in all_countries:
+    for name in country_names:
         try:
-            encoded_country_map[name] = encoders['Country'].transform([name])[0]
+            encoded_country_map[name] = _encoders['Country'].transform([name])[0]
         except:
             encoded_country_map[name] = 0
     
     encoded_city_map = {}
-    all_cities = city_df['CityName'].tolist()
-    for name in all_cities:
+    for name in city_names:
         try:
-            encoded_city_map[name] = encoders['CityName'].transform([name])[0]
+            encoded_city_map[name] = _encoders['CityName'].transform([name])[0]
         except:
             encoded_city_map[name] = 0
     
     encoded_type_map = {}
     for name in type_names:
         try:
-            encoded_type_map[name] = encoders['AttractionType'].transform([name])[0]
+            encoded_type_map[name] = _encoders['AttractionType'].transform([name])[0]
         except:
             encoded_type_map[name] = 0
     
-    season_names = ['Winter', 'Spring', 'Summer', 'Fall']
     encoded_season_map = {}
     for name in season_names:
         try:
-            encoded_season_map[name] = encoders['Season'].transform([name])[0]
+            encoded_season_map[name] = _encoders['Season'].transform([name])[0]
         except:
             encoded_season_map[name] = 0
+    
+    return (encoded_continent_map, encoded_region_map, encoded_country_map,
+            encoded_city_map, encoded_type_map, encoded_season_map)
 
+@st.cache_data(show_spinner=False)
+def build_cascading_maps(region_df, country_df, city_df):
+    """Cache the cascading hierarchy maps."""
+    region_map = {}
+    for _, row in region_df.iterrows():
+        cont_id = row['ContinentId']
+        if cont_id not in region_map:
+            region_map[cont_id] = []
+        region_map[cont_id].append(row['Region'])
+    
+    country_map = {}
+    for _, row in country_df.iterrows():
+        reg_id = row['RegionId']
+        if reg_id not in country_map:
+            country_map[reg_id] = []
+        country_map[reg_id].append(row['Country'])
+    
+    city_map = {}
+    for _, row in city_df.iterrows():
+        cou_id = row['CountryId']
+        if cou_id not in city_map:
+            city_map[cou_id] = []
+        city_map[cou_id].append(row['CityName'])
+    
+    return region_map, country_map, city_map
+
+@st.cache_resource(show_spinner=False)
+def load_all_assets():
+    """Load all models, data, and pre-computed maps (CACHED)."""
+    df = load_cleaned_data()
+    continent_df, region_df, country_df, city_df, type_df = load_mapping_tables()
+    feature_names, encoders, attraction_list, attractions_df = load_small_pickles()
+    reg_model, clf_model, similarity_matrix = load_models_cached()
+    
+    # Build names
+    continent_names = continent_df['Continent'].tolist()
+    region_names = region_df['Region'].tolist()
+    country_names = country_df['Country'].tolist()
+    city_names = city_df['CityName'].tolist()
+    type_names = type_df['AttractionType'].tolist()
+    season_names = ['Winter', 'Spring', 'Summer', 'Fall']
+    
+    # Build encoding maps (cached)
+    (encoded_continent_map, encoded_region_map, encoded_country_map,
+     encoded_city_map, encoded_type_map, encoded_season_map) = build_encoding_maps(
+        continent_names, region_names, country_names, city_names, 
+        type_names, season_names, encoders
+    )
+    
+    # Build cascading maps (cached)
+    region_map, country_map, city_map = build_cascading_maps(region_df, country_df, city_df)
+    
     return (reg_model, clf_model, feature_names, encoders, attraction_list,
             attractions_df, similarity_matrix, df,
             continent_names, region_map, country_map, city_map, type_names,
@@ -556,9 +544,8 @@ def load_all_assets():
             continent_df, region_df, country_df, city_df)
 
 # ============================================================
-# ========== LOAD ASSETS =====================================
+# ========== LOAD ASSETS (ONCE) ==============================
 # ============================================================
-
 (reg_model, clf_model, feature_names, encoders, attraction_list,
  attractions_df, similarity_matrix, df,
  continent_names, region_map, country_map, city_map, type_names,
@@ -599,16 +586,17 @@ def get_real_prediction(continent, region, country, city, month, year, attractio
         pred_mode = encoders['VisitMode'].inverse_transform([pred_mode_enc])[0]
     except:
         pred_mode = "Unknown"
-
-    # Debug to terminal
-    print("="*60)
-    print("🔍 INPUT DATA:")
-    print(input_df)
-    print("📊 Predicted Rating:", pred_rating)
-    print("📊 Predicted Mode:", pred_mode)
-    print("="*60)
-
     return pred_rating, pred_mode
+
+def recommend_attractions(attraction_name, top_n=5):
+    if attraction_name not in attractions_df['Attraction'].values:
+        popular = df['Attraction'].value_counts().head(top_n).index.tolist()
+        return popular
+    idx = attractions_df[attractions_df['Attraction'] == attraction_name].index[0]
+    sim_scores = list(enumerate(similarity_matrix[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:top_n+1]
+    return attractions_df.iloc[[i[0] for i in sim_scores]]['Attraction'].tolist()
 
 # ========== SIDEBAR ==========
 with st.sidebar:
@@ -622,7 +610,6 @@ with st.sidebar:
     st.markdown("**🔥 WELCOME, REBEL!**")
     st.markdown("Predict. Explore. Dominate.")
     st.markdown("---")
-    
     st.markdown("### ⚡ QUICK STATS")
     
     col1, col2 = st.columns(2)
@@ -643,7 +630,6 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("💡 **PRO TIP:** Click the recommendations tab for BANGERS.")
-
     st.markdown("""
     <div style="text-align:center; margin-top:2rem; font-size:3rem; opacity:0.5;">
         🏝️ 🏔️ 🏛️
@@ -690,7 +676,7 @@ with tab1:
         attr_avg = st.slider("⭐ ATTRACTION AVG RATING", 1.0, 5.0, 4.0, 0.1, key='attr_avg')
 
     if st.button("🔮 PREDICT NOW!", use_container_width=True):
-        with st.spinner("🧠 CALCULATING MAYHEM..."):
+        with st.spinner("🧠 CALCULATING..."):
             try:
                 pred_rating, pred_mode = get_real_prediction(
                     continent, region, country, city,
@@ -711,24 +697,14 @@ with tab1:
                     """, unsafe_allow_html=True)
                 with col2:
                     mode_icons = {
-                        'Family': '👨‍👩‍👧‍👦',
-                        'Couples': '💕',
-                        'Business': '💼',
-                        'Friends': '🎉',
-                        'Solo': '🧳'
+                        'Family': '👨‍👩‍👧‍👦', 'Couples': '💕', 'Business': '💼',
+                        'Friends': '🎉', 'Solo': '🧳'
                     }
                     icon = mode_icons.get(pred_mode, '🌟')
                     st.markdown(f"""
                     <div class="brutal-card brutal-card-pink">
                         <div class="metric-label">🎯 PREDICTED VIBE</div>
                         <div class="metric-value" style="font-size:3rem;">{icon} {pred_mode}</div>
-                        <div style="background:black; color:white; padding:4px 12px; display:inline-block; font-weight:700; font-size:0.8rem;">
-                            {pred_mode == 'Family' and '👨‍👩‍👧‍👦 FAMILY FUN' or ''}
-                            {pred_mode == 'Couples' and '💕 ROMANTIC CHAOS' or ''}
-                            {pred_mode == 'Business' and '💼 HUSTLE MODE' or ''}
-                            {pred_mode == 'Friends' and '🎉 PARTY TIME' or ''}
-                            {pred_mode == 'Solo' and '🧳 LONE WOLF' or ''}
-                        </div>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -740,16 +716,6 @@ with tab1:
 with tab2:
     st.header("🔎 FIND YOUR NEXT OBSESSION")
     st.markdown("PICK A PLACE, GET CHAOS.")
-    
-    def recommend_attractions(attraction_name, top_n=5):
-        if attraction_name not in attractions_df['Attraction'].values:
-            popular = df['Attraction'].value_counts().head(top_n).index.tolist()
-            return popular
-        idx = attractions_df[attractions_df['Attraction'] == attraction_name].index[0]
-        sim_scores = list(enumerate(similarity_matrix[idx]))
-        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-        sim_scores = sim_scores[1:top_n+1]
-        return attractions_df.iloc[[i[0] for i in sim_scores]]['Attraction'].tolist()
     
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -780,17 +746,14 @@ with tab3:
     st.header("📈 CHAOS DASHBOARD")
     st.markdown("DATA VIZ THAT HITS DIFFERENT.")
     
-    # Visit Mode Distribution
     visit_mode_counts = df['VisitMode'].value_counts().reset_index()
     visit_mode_counts.columns = ['VisitMode', 'Count']
     fig1 = px.bar(visit_mode_counts, x='VisitMode', y='Count', color='VisitMode',
                   title="VISIT MODES (BRUTAL)", text_auto=True,
                   color_discrete_sequence=['#ff0033', '#ffcc00', '#00ffcc', '#ff6600', '#ce93d8'])
     fig1.update_layout(
-        showlegend=False,
-        height=400,
-        plot_bgcolor='white',
-        paper_bgcolor='white',
+        showlegend=False, height=400,
+        plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family='Courier New, monospace', size=14, color='black'),
         margin=dict(l=20, r=20, t=40, b=20),
         xaxis=dict(showgrid=False, linecolor='black', linewidth=4),
@@ -798,17 +761,13 @@ with tab3:
     )
     st.plotly_chart(fig1, use_container_width=True)
 
-    # Top 10 Attractions
     top_attractions = df['Attraction'].value_counts().head(10).reset_index()
     top_attractions.columns = ['Attraction', 'Visits']
     fig2 = px.bar(top_attractions, x='Attraction', y='Visits', color='Visits',
-                  title="TOP 10 ATTACKS (I MEAN ATTRACTIONS)",
-                  color_continuous_scale='Oranges')
+                  title="TOP 10 ATTRACTIONS", color_continuous_scale='Oranges')
     fig2.update_layout(
-        height=400,
-        xaxis_tickangle=-45,
-        plot_bgcolor='white',
-        paper_bgcolor='white',
+        height=400, xaxis_tickangle=-45,
+        plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family='Courier New, monospace', size=14, color='black'),
         margin=dict(l=20, r=20, t=40, b=20),
         xaxis=dict(showgrid=False, linecolor='black', linewidth=4),
@@ -816,17 +775,14 @@ with tab3:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-    # Rating by Month
     monthly_rating = df.groupby('VisitMonth')['Rating'].mean().reset_index()
     fig3 = px.line(monthly_rating, x='VisitMonth', y='Rating',
-                   title="RATING ROLLERCOASTER BY MONTH",
-                   markers=True, line_shape='spline')
+                   title="RATING BY MONTH", markers=True, line_shape='spline')
     fig3.update_traces(line_color='#ff0033', marker_color='#ffcc00', marker_size=14,
                        marker_line=dict(color='black', width=4))
     fig3.update_layout(
         height=400,
-        plot_bgcolor='white',
-        paper_bgcolor='white',
+        plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family='Courier New, monospace', size=14, color='black'),
         margin=dict(l=20, r=20, t=40, b=20),
         xaxis=dict(tickmode='linear', tick0=1, dtick=1, showgrid=False, linecolor='black', linewidth=4),
@@ -834,16 +790,13 @@ with tab3:
     )
     st.plotly_chart(fig3, use_container_width=True)
 
-    # Two columns
     col1, col2 = st.columns(2)
     with col1:
         fig4 = px.histogram(df, x='Rating', nbins=20,
-                            title="RATING DISTRIBUTION (RAW)",
-                            color_discrete_sequence=['#ff6600'])
+                            title="RATING DISTRIBUTION", color_discrete_sequence=['#ff6600'])
         fig4.update_layout(
             height=350,
-            plot_bgcolor='white',
-            paper_bgcolor='white',
+            plot_bgcolor='white', paper_bgcolor='white',
             font=dict(family='Courier New, monospace', size=14, color='black'),
             margin=dict(l=20, r=20, t=40, b=20),
             xaxis=dict(showgrid=False, linecolor='black', linewidth=4),
@@ -854,27 +807,21 @@ with tab3:
         type_counts = df['AttractionType'].value_counts().reset_index()
         type_counts.columns = ['AttractionType', 'Count']
         fig5 = px.pie(type_counts, values='Count', names='AttractionType',
-                      title="ATTRACTION TYPES (PIE OF CHAOS)",
+                      title="ATTRACTION TYPES",
                       color_discrete_sequence=['#ff0033', '#ffcc00', '#00ffcc', '#ff6600', '#ce93d8', '#4fc3f7'])
         fig5.update_traces(textposition='inside', textinfo='percent+label')
-        fig5.update_layout(
-            height=350,
-            font=dict(family='Courier New, monospace', size=14, color='black'),
-            margin=dict(l=20, r=20, t=40, b=20)
-        )
+        fig5.update_layout(height=350,
+                           font=dict(family='Courier New, monospace', size=14, color='black'),
+                           margin=dict(l=20, r=20, t=40, b=20))
         st.plotly_chart(fig5, use_container_width=True)
 
-    # Top Cities
     city_visits = df['CityName'].value_counts().head(10).reset_index()
     city_visits.columns = ['City', 'Visits']
     fig6 = px.bar(city_visits, x='City', y='Visits', color='Visits',
-                  title="TOP CITIES (WHERE THE PARTY AT)",
-                  color_continuous_scale='Reds')
+                  title="TOP CITIES", color_continuous_scale='Reds')
     fig6.update_layout(
-        height=400,
-        xaxis_tickangle=-45,
-        plot_bgcolor='white',
-        paper_bgcolor='white',
+        height=400, xaxis_tickangle=-45,
+        plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family='Courier New, monospace', size=14, color='black'),
         margin=dict(l=20, r=20, t=40, b=20),
         xaxis=dict(showgrid=False, linecolor='black', linewidth=4),
