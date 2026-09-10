@@ -18,4 +18,4 @@
 
 - ## Links
 - **Live App:** https://tourismrage-knbycheejsmbrpth64z2t2.streamlit.app/
-- **GitHub Repository:** https://github.com/simranpatra006/EMIPredict-AI
+- **GitHub Repository:** https://github.com/simranpatra006/Tourism_Rage.git
