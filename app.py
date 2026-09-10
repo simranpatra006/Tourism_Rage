@@ -346,11 +346,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# ========== AUTO-TRAINING SECTION ==========================
+# ========== OPTIMIZED AUTO-TRAINING =========================
 # ============================================================
 
+import gc  # Add this to your imports at the top
+
+@st.cache_resource(show_spinner=False)
 def train_models_and_similarity():
-    """Train all models and similarity matrix if missing."""
+    """Train all models and similarity matrix with MEMORY OPTIMIZATION."""
     with st.spinner("🔄 Training models... This may take 1-2 minutes."):
         try:
             # Load data
@@ -367,29 +370,59 @@ def train_models_and_similarity():
             X_train, X_test, y_reg_train, y_reg_test = train_test_split(X, y_reg, test_size=0.2, random_state=42)
             _, _, y_clf_train, y_clf_test = train_test_split(X, y_clf, test_size=0.2, random_state=42)
 
-            # Regression
-            reg_model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+            # ---------- REGRESSION (Smaller Model) ----------
+            print("Training Regressor...")
+            reg_model = RandomForestRegressor(
+                n_estimators=50,       # Reduced from 100
+                max_depth=15,          # Limit depth
+                min_samples_split=10,  # Prevent overfitting
+                n_jobs=1,              # Single-threaded to save memory
+                random_state=42
+            )
             reg_model.fit(X_train, y_reg_train)
-            pickle.dump(reg_model, open('regressor.pkl', 'wb'))
+            
+            # Use joblib for better compression
+            import joblib
+            joblib.dump(reg_model, 'regressor.pkl', compress=3)
+            print(f"✅ Regressor saved ({os.path.getsize('regressor.pkl') / 1024:.1f} KB)")
+            
+            # Free memory
+            del reg_model
+            gc.collect()
 
-            # Classification
-            clf_model = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42, n_jobs=-1)
+            # ---------- CLASSIFICATION (Smaller Model) ----------
+            print("Training Classifier...")
+            clf_model = RandomForestClassifier(
+                n_estimators=50,
+                max_depth=15,
+                min_samples_split=10,
+                class_weight='balanced',
+                n_jobs=1,
+                random_state=42
+            )
             clf_model.fit(X_train, y_clf_train)
-            pickle.dump(clf_model, open('classifier.pkl', 'wb'))
+            joblib.dump(clf_model, 'classifier.pkl', compress=3)
+            print(f"✅ Classifier saved ({os.path.getsize('classifier.pkl') / 1024:.1f} KB)")
+            
+            # Free memory
+            del clf_model, X_train, X_test
+            gc.collect()
 
-            # ---------- Build Similarity Matrix ----------
-            # Load attractions data
+            # ---------- SIMILARITY MATRIX ----------
+            print("Building similarity matrix...")
             attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
             
-            # Encode AttractionType and CityName
             encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
             feature_vectors = encoder.fit_transform(attractions_df[['AttractionType', 'CityName']])
             
-            # Compute cosine similarity
             similarity_matrix = cosine_similarity(feature_vectors)
-            pickle.dump(similarity_matrix, open('similarity_matrix.pkl', 'wb'))
+            joblib.dump(similarity_matrix, 'similarity_matrix.pkl', compress=3)
+            print(f"✅ Similarity matrix saved ({os.path.getsize('similarity_matrix.pkl') / 1024:.1f} KB)")
             
-            st.success("✅ All models and similarity matrix trained successfully!")
+            # Free memory
+            del similarity_matrix, feature_vectors, attractions_df
+            gc.collect()
+            
             return True
         except Exception as e:
             st.error(f"❌ Training failed: {e}")
@@ -406,26 +439,30 @@ def ensure_models_and_similarity():
         st.warning(f"⚠️ Missing files: {missing}. Training now...")
         success = train_models_and_similarity()
         if success:
+            st.success("✅ Training complete! Loading app...")
             st.rerun()
         else:
             st.stop()
 
-# Run the check before loading anything else
+# Run the check
 ensure_models_and_similarity()
 
 # ============================================================
 # ========== LOAD ALL MODELS AND DATA ========================
 # ============================================================
 
+# ========== LOAD ALL MODELS AND DATA ==========
 def load_all_assets():
     """Load all models, encoders, dataframes, and similarity matrix."""
-    reg_model = pickle.load(open('regressor.pkl', 'rb'))
-    clf_model = pickle.load(open('classifier.pkl', 'rb'))
+    import joblib
+    
+    reg_model = joblib.load('regressor.pkl')
+    clf_model = joblib.load('classifier.pkl')
     feature_names = pickle.load(open('feature_names.pkl', 'rb'))
     encoders = pickle.load(open('encoders.pkl', 'rb'))
     attraction_list = pickle.load(open('attraction_list.pkl', 'rb'))
     attractions_df = pickle.load(open('attractions_df.pkl', 'rb'))
-    similarity_matrix = pickle.load(open('similarity_matrix.pkl', 'rb'))
+    similarity_matrix = joblib.load('similarity_matrix.pkl')
     df = pd.read_csv('cleaned_tourism.csv')
 
     # Load mapping tables for dropdowns
