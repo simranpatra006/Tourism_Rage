@@ -15,3 +15,7 @@
 - Neo-Brutalist UI with bold colors and chunky borders
 - Fully responsive
 - Mobile-friendly
+
+- ## Links
+- **Live App:** https://tourismrage-knbycheejsmbrpth64z2t2.streamlit.app/
+- **GitHub Repository:** https://github.com/simranpatra006/EMIPredict-AI
